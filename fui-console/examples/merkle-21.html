@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="MERKLE-21: a live sci-fi console for the Bitcoin network. Hashrate, blocks, mempool, difficulty and supply. Not financial advice.">
+<meta name="theme-color" content="#070a12">
+<title>MERKLE-21 · Bitcoin Proof-of-Work Observatory</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Share+Tech+Mono&display=swap">
+<style>
+/* Layout: one-screen console. Left rail = market + supply, center = hash-furnace canvas, right rail = chain log + mempool strata. Stacks to one column on phones. Single deliberate dark look. */
+:root{
+  --void:#070a12;        /* deep space ground */
+  --panel:#0c111d;       /* instrument glass */
+  --line:#1d2840;        /* grid + hairlines */
+  --dim:#5d6b8a;         /* captions */
+  --ink:#c9d4ea;         /* body text */
+  --amber:#ffb340;       /* phosphor primary: proof-of-work heat */
+  --ice:#6fd3ff;         /* secondary: network / chain */
+  --alert:#ff5277;       /* fee pressure / warnings */
+  --f-display:"Chakra Petch","Segoe UI",system-ui,sans-serif;
+  --f-data:"Share Tech Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+html,body{margin:0}
+body{background:var(--void);color:var(--ink);font-family:var(--f-data);font-size:13px;overflow:hidden}
+*{box-sizing:border-box}
+.console{height:100%;display:grid;grid-template-columns:minmax(220px,280px) minmax(0,1fr) minmax(240px,320px);grid-template-rows:auto minmax(0,1fr) auto;gap:10px;padding-block:12px;padding-inline:16px;position:relative}
+.console::before{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 3px);z-index:5}
+header{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px;border-bottom:1px solid var(--line);padding-bottom:8px}
+.brand{text-decoration:none;font-family:var(--f-display);font-weight:700;font-size:22px;letter-spacing:.18em;color:var(--amber);text-shadow:0 0 14px rgba(255,179,64,.35)}
+.brand small{font-weight:400;font-size:11px;letter-spacing:.24em;color:var(--dim);margin-left:10px}
+.hdr-meta{display:flex;flex-wrap:wrap;gap:6px 16px;margin-left:auto;color:var(--dim);font-size:11px;letter-spacing:.08em}
+.hdr-meta b{color:var(--ink);font-weight:400}
+.pill{border:1px solid var(--line);padding:2px 8px;color:var(--ice);letter-spacing:.14em;font-size:10px}
+.pill.warn{color:var(--amber);border-color:rgba(255,179,64,.4)}
+.pill.live{color:var(--ice);border-color:rgba(111,211,255,.5)}
+.pill.live::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--ice);margin-right:6px;vertical-align:1px;animation:blink 1.6s ease-in-out infinite}
+@keyframes blink{50%{opacity:.25}}
+.blk[data-new]{animation:land 1.2s ease both}
+@keyframes land{0%{background:rgba(255,179,64,.45);transform:translateX(-10px)}100%{background:rgba(255,179,64,.06)}}
+.credit{color:var(--dim)}.credit a{color:var(--ice)}
+button{font:inherit;font-size:10px;letter-spacing:.16em;background:transparent;color:var(--ice);border:1px solid var(--ice);padding:3px 10px;cursor:pointer;text-transform:uppercase}
+button:hover{background:rgba(111,211,255,.1)}
+button:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.rail{display:flex;flex-direction:column;gap:10px;min-height:0;min-width:0;overflow:auto;scrollbar-width:thin}
+.mod{border:1px solid var(--line);background:linear-gradient(180deg,rgba(12,17,29,.92),rgba(7,10,18,.92));padding:10px 12px;position:relative}
+.mod::after{content:"";position:absolute;top:-1px;left:-1px;width:10px;height:10px;border-top:1px solid var(--amber);border-left:1px solid var(--amber)}
+.lbl{font-family:var(--f-display);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--dim);display:flex;justify-content:space-between;gap:8px;margin-bottom:6px}
+.lbl span:last-child{color:var(--dim);opacity:.6;letter-spacing:.1em}
+.big{font-family:var(--f-display);font-weight:600;font-size:32px;letter-spacing:.02em;color:var(--amber);font-variant-numeric:tabular-nums;line-height:1.05}
+.big.ice{color:var(--ice)}
+.sub{color:var(--dim);font-size:11px;margin-top:4px}
+.row{display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px dashed rgba(29,40,64,.7);font-variant-numeric:tabular-nums}
+.row:last-child{border-bottom:0}
+.row .k{color:var(--dim)}
+.bar{height:6px;background:var(--line);margin-top:8px;position:relative;overflow:hidden}
+.bar i{position:absolute;inset:0 auto 0 0;background:var(--amber);box-shadow:0 0 10px var(--amber)}
+.bar.ice i{background:var(--ice);box-shadow:0 0 10px var(--ice)}
+.stage{position:relative;min-height:0;min-width:0;border:1px solid var(--line);background:radial-gradient(circle at 50% 46%,rgba(255,179,64,.07),transparent 60%),var(--void)}
+#furnace{position:absolute;inset:0;width:100%;height:100%;display:block}
+.stage-cap{position:absolute;left:12px;bottom:10px;right:12px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:10px;letter-spacing:.14em;color:var(--dim);pointer-events:none}
+.stage-cap b{color:var(--ice);font-weight:400}
+@media (max-width:520px){.stage-cap .amb{display:none}}
+.blocks{display:flex;flex-direction:column;gap:4px}
+.blk{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:4px 6px;border-left:2px solid var(--line);font-variant-numeric:tabular-nums;font-size:12px;animation:slide .6s ease both}
+.blk:first-child{border-left-color:var(--amber);background:rgba(255,179,64,.06)}
+.blk .h{color:var(--ink)}
+.blk .p{color:var(--dim);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.blk .f{color:var(--ice)}
+@keyframes slide{from{transform:translateX(8px)}to{transform:none}}
+.strata{display:flex;flex-direction:column;gap:2px;margin-top:4px}
+.stratum{display:grid;grid-template-columns:62px 1fr 52px;gap:8px;align-items:center;font-size:11px;font-variant-numeric:tabular-nums}
+.stratum .t{height:8px;background:var(--line);position:relative}
+.stratum .t i{position:absolute;inset:0 auto 0 0}
+footer{grid-column:1/-1;border-top:1px solid var(--line);padding-top:6px;overflow:hidden;white-space:nowrap;color:var(--dim);font-size:11px;letter-spacing:.08em;position:relative}
+.tick{display:inline-block;padding-left:100%;animation:tick 90s linear infinite}
+.tick b{color:var(--amber);font-weight:400}
+.tick em{color:var(--ice);font-style:normal}
+@keyframes tick{to{transform:translateX(-100%)}}
+@media (prefers-reduced-motion:reduce){.tick{animation:none;padding-left:0}.blk{animation:none}}
+@media (max-width:880px){
+  body{overflow:auto}
+  .console{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:62vw;min-height:300px;order:-1}
+  header{order:-2}
+  .rail{overflow:visible}
+  footer{order:9}
+}
+</style>
+</head>
+<body>
+
+<div class="console" id="console">
+  <header>
+    <a class="brand" href="#" title="MERKLE-21">MERKLE-21<small>BITCOIN PROOF-OF-WORK OBSERVATORY · MAINNET</small></a>
+    <div class="hdr-meta">
+      <span>UTC <b id="clock">--:--:--</b></span>
+      <span>TIP SEEN <b id="tipSeen">--</b></span>
+      <span class="pill warn" id="feed">FEED · SNAPSHOT</span>
+      <span class="credit">DATA <a href="https://mempool.space" target="_blank" rel="noopener">mempool.space</a> · NOT FINANCIAL ADVICE</span>
+      <button id="fs" type="button">Full screen</button>
+    </div>
+  </header>
+
+  <aside class="rail">
+    <section class="mod">
+      <div class="lbl"><span>BTC / USD</span><span id="priceAt">--</span></div>
+      <div class="big" id="price">--</div>
+      <div class="sub" id="satsPerDollar">--</div>
+    </section>
+    <section class="mod">
+      <div class="lbl"><span>Issued supply</span><span>EST</span></div>
+      <div class="big ice" id="supply">--</div>
+      <div class="sub" id="supplyPct">--</div>
+      <div class="bar ice"><i id="supplyBar"></i></div>
+    </section>
+    <section class="mod">
+      <div class="lbl"><span>Halving epoch V</span><span>3.125 BTC</span></div>
+      <div class="row"><span class="k">Next halving</span><span>1,050,000</span></div>
+      <div class="row"><span class="k">Blocks left</span><span id="halvLeft">--</span></div>
+      <div class="row"><span class="k">ETA @ 10 min</span><span id="halvEta">--</span></div>
+      <div class="bar"><i id="halvBar"></i></div>
+    </section>
+    <section class="mod">
+      <div class="lbl"><span>Difficulty epoch</span><span>2016 BLK</span></div>
+      <div class="row"><span class="k">Difficulty</span><span id="diff">--</span></div>
+      <div class="row"><span class="k">Progress</span><span id="diffProg">--</span></div>
+      <div class="row"><span class="k">Est. retarget</span><span id="diffChg">--</span></div>
+      <div class="row"><span class="k">Retarget at</span><span id="diffWhen">--</span></div>
+      <div class="bar ice"><i id="diffBar"></i></div>
+    </section>
+  </aside>
+
+  <main class="stage" aria-label="Hash furnace: 30-day hashrate ring with mempool particles">
+    <canvas id="furnace"></canvas>
+    <div class="stage-cap">
+      <span>RING · 30-DAY HASHRATE <b id="hrRange">--</b></span>
+      <span class="amb">PARTICLES · AMBIENT, NOT INDIVIDUAL TX</span>
+    </div>
+  </main>
+
+  <aside class="rail">
+    <section class="mod">
+      <div class="lbl"><span>Chain log</span><span>LAST 15</span></div>
+      <div class="row"><span class="k">Since tip</span><span id="since" style="color:var(--amber)">--</span></div>
+      <div class="row"><span class="k">Avg interval</span><span id="avgInt">--</span></div>
+      <div class="blocks" id="blocks"></div>
+    </section>
+    <section class="mod">
+      <div class="lbl"><span>Mempool strata</span><span>SAT/VB</span></div>
+      <div class="row"><span class="k">Pending tx</span><span id="mpCount">--</span></div>
+      <div class="row"><span class="k">Backlog</span><span id="mpBlocks">--</span></div>
+      <div class="row"><span class="k">Fees waiting</span><span id="mpFees">--</span></div>
+      <div class="strata" id="strata"></div>
+    </section>
+  </aside>
+
+  <footer><span class="tick" id="tick"></span></footer>
+</div>
+
+<script>
+/* ---------- Fallback snapshot (2026-10-06), shown until the live feed answers ---------- */
+let SNAP = {
+  price:{usd:85767, t:1791244812},
+  blocks:[
+    [970182,1791295399,3025,1539202,1.03,1349658,"AntPool"],
+    [970181,1791295277,4223,1608495,2.04,3153057,"Foundry USA"],
+    [970180,1791294281,3127,1601777,2.00,2382464,"Foundry USA"],
+    [970179,1791293847,3782,1569854,3.01,3966902,"Luxor"],
+    [970178,1791292409,3533,1550598,1.03,1466584,"AntPool"],
+    [970177,1791292196,4150,1683474,2.01,3092949,"F2Pool"],
+    [970176,1791291092,4145,1953999,0.30,530235,"Foundry USA"],
+    [970175,1791291061,5863,1607020,0.32,817148,"Braiins Pool"],
+    [970174,1791290901,6660,1455578,0.43,746875,"Foundry USA"],
+    [970173,1791290840,3387,1482430,1.11,1981594,"Foundry USA"],
+    [970172,1791290404,4439,1570970,2.29,4178484,"F2Pool"],
+    [970171,1791288804,6482,1546979,0.60,820108,"AntPool"],
+    [970170,1791288729,3509,1554434,1.21,2514877,"F2Pool"],
+    [970169,1791288169,3604,1498468,1.30,1994972,"Foundry USA"],
+    [970168,1791287781,4470,1569467,3.03,3905049,"ViaBTC"]
+  ],
+  hashrate:{current:960.6, day0:1788739200,
+    series:[1040.1,881.3,857.9,1018.9,835.9,1025.4,986.7,965.6,958.3,1020.9,874.0,895.6,953.9,826.1,1016.0,984.4,934.4,836.6,933.5,880.0,1019.5,954.7,1088.3,1051.0,928.6,910.9,935.6,868.7,946.5,1177.2]},
+  difficulty:{value:132716002350731.3, progress:19.097, change:1.742, remaining:1631, retarget:1792198836, nextHeight:971712},
+  mempool:{count:70576, vsize:39887692, totalFee:5963233,
+    hist:[[2.019,55411],[1.007,50020],[0.295,50005],[0.295,108003],[0.281,263549],[0.259,114763],[0.252,378443],[0.250,72569],[0.250,135880],[0.250,135882],[0.250,67944],[0.246,88540],[0.245,87153],[0.24,144345],[0.230,149019],[0.230,63325],[0.230,149536],[0.230,224475],[0.230,74595],[0.230,80403],[0.230,224130],[0.230,80575],[0.224,50351],[0.223,117506],[0.220,99512],[0.220,81520],[0.220,89212],[0.220,92798],[0.220,69406],[0.220,53010],[0.220,52199],[0.220,59645],[0.216,52069],[0.214,56654],[0.211,58958],[0.210,57367],[0.209,87136],[0.208,2407305],[0.205,50972],[0.204,146409]]}
+};
+
+const $ = id => document.getElementById(id);
+const fmt = (n,d=0) => n.toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+const hhmm = t => new Date(t*1000).toISOString().slice(11,16)+"Z";
+const dstr = t => new Date(t*1000).toISOString().slice(5,10).replace("-","/");
+let tip, D, M, hs, hMin, hMax, sums = [0,0,0,0,0], fresh = false;
+const bands=[[5,Infinity,"≥ 5"],[2,5,"2–5"],[1,2,"1–2"],[0.25,1,"0.25–1"],[0,0.25,"< 0.25"]];
+function render(){
+tip = SNAP.blocks[0];
+
+/* ---------- Left rail ---------- */
+$("price").textContent = "$"+fmt(SNAP.price.usd);
+$("priceAt").textContent = "@ "+hhmm(SNAP.price.t);
+$("satsPerDollar").textContent = fmt(1e8/SNAP.price.usd)+" sats per dollar";
+
+// Issued supply: 19,687,500 BTC through block 839,999, then 3.125 BTC per block
+const supply = 19687500 + (tip[0]-839999)*3.125;
+$("supply").textContent = fmt(supply/1e6,3)+"M";
+$("supplyPct").textContent = fmt(supply/21e6*100,2)+"% of 21,000,000 · ~"+fmt(21e6-supply)+" left";
+$("supplyBar").style.width = (supply/21e6*100)+"%";
+
+const halvLeft = 1050000 - tip[0];
+$("halvLeft").textContent = fmt(halvLeft);
+$("halvEta").textContent = "~"+fmt(halvLeft*600/86400)+" days";
+$("halvBar").style.width = ((tip[0]-840000)/210000*100)+"%";
+
+D = SNAP.difficulty;
+$("diff").textContent = fmt(D.value/1e12,2)+" T";
+$("diffProg").textContent = fmt(D.progress,1)+"% · "+fmt(D.remaining)+" left";
+$("diffChg").textContent = (D.change>=0?"+":"")+fmt(D.change,2)+"%";
+$("diffChg").style.color = D.change>=0 ? "var(--amber)" : "var(--ice)";
+$("diffWhen").textContent = dstr(D.retarget)+" · #"+fmt(D.nextHeight);
+$("diffBar").style.width = D.progress+"%";
+
+/* ---------- Right rail ---------- */
+$("tipSeen").textContent = "#"+fmt(tip[0])+" "+hhmm(tip[1]);
+const avg = (tip[1]-SNAP.blocks[14][1])/14;
+$("avgInt").textContent = Math.floor(avg/60)+"m "+String(Math.round(avg%60)).padStart(2,"0")+"s";
+$("blocks").innerHTML = SNAP.blocks.map((b,i)=>
+  `<div class="blk" style="animation-delay:${i*40}ms"${i===0&&fresh?' data-new':''}><span class="h">${fmt(b[0])}</span><span class="p">${b[6]} · ${fmt(b[2])} tx</span><span class="f">${b[4].toFixed(2)}</span></div>`).join("");
+
+M = SNAP.mempool;
+$("mpCount").textContent = fmt(M.count);
+$("mpBlocks").textContent = "~"+fmt(M.vsize/1e6,1)+" blocks deep";
+$("mpFees").textContent = fmt(M.totalFee/1e8,4)+" BTC";
+// Group histogram into fee strata
+sums=bands.map(([lo,hi])=>M.hist.filter(h=>h[0]>=lo&&h[0]<hi).reduce((s,h)=>s+h[1],0));
+const maxS=Math.max(...sums);
+$("strata").innerHTML = bands.map((b,i)=>{
+  const c = i===0?"var(--alert)":i===1?"var(--amber)":"var(--ice)";
+  return `<div class="stratum"><span style="color:var(--dim)">${b[2]}</span><span class="t"><i style="width:${sums[i]/maxS*100}%;background:${c};opacity:${1-i*.13}"></i></span><span style="text-align:right">${fmt(sums[i]/1e6,2)}M</span></div>`;
+}).join("") + `<div class="sub">vbytes waiting, by fee rate</div>`;
+
+hs = SNAP.hashrate.series;
+hMin = Math.min(...hs); hMax = Math.max(...hs);
+$("hrRange").textContent = fmt(hMin)+"–"+fmt(hMax)+" EH/s";
+
+$("tick").innerHTML = SNAP.blocks.map(b=>`<b>BLK ${fmt(b[0])}</b> ${hhmm(b[1])} · ${b[6]} · <em>${fmt(b[2])} tx</em> · ${fmt(b[5]/1e8,4)} BTC fees · ${fmt(b[3]/1e6,2)} MB`).join("  ◆  ")
+  + `  ◆  <b>HASHRATE</b> ${fmt(SNAP.hashrate.current,1)} EH/s  ◆  <b>MEMPOOL</b> ${fmt(M.count)} tx pending  ◆  <b>DIFFICULTY</b> ${fmt(D.value/1e12,2)} T, retarget est. ${D.change>=0?"+":""}${fmt(D.change,2)}%`;
+
+
+  feeWeights = sums.map(s=>s/(sums.reduce((a,b)=>a+b,0)||1));
+}
+let feeWeights=[.2,.2,.2,.2,.2];
+render();
+
+
+/* ---------- Live feed: mempool.space public API, fetched by the visitor's browser ---------- */
+const API = "https://mempool.space/api";
+const getJSON = async (path) => { const r = await fetch(API+path, {cache:"no-store"}); if(!r.ok) throw new Error(path+" "+r.status); return r.json(); };
+let lastOK = 0, newBlockAt = -1e9;
+const loaders = {
+  async blocks(){
+    const j = await getJSON("/v1/blocks");
+    const rows = j.slice(0,15).map(b=>[b.height,b.timestamp,b.tx_count,b.size,(b.extras&&b.extras.medianFee)||0,(b.extras&&b.extras.totalFees)||0,(b.extras&&b.extras.pool&&b.extras.pool.name)||"Unknown"]);
+    if(rows.length<2) return;
+    if(SNAP.blocks.length && rows[0][0] > SNAP.blocks[0][0]){ fresh = true; newBlockAt = performance.now(); }
+    SNAP.blocks = rows;
+  },
+  async price(){
+    const j = await getJSON("/v1/prices");
+    if(j && j.USD) SNAP.price = {usd:j.USD, t:j.time};
+  },
+  async mempool(){
+    const j = await getJSON("/mempool");
+    SNAP.mempool = {count:j.count, vsize:j.vsize, totalFee:j.total_fee, hist:j.fee_histogram||[]};
+  },
+  async difficulty(){
+    const j = await getJSON("/v1/difficulty-adjustment");
+    const hr = SNAP.difficulty;
+    SNAP.difficulty = {value:hr.value, progress:j.progressPercent, change:j.difficultyChange, remaining:j.remainingBlocks, retarget:Math.round(j.estimatedRetargetDate/1000), nextHeight:j.nextRetargetHeight};
+  },
+  async hashrate(){
+    const j = await getJSON("/v1/mining/hashrate/1m");
+    const series = (j.hashrates||[]).slice(-30).map(h=>h.avgHashrate/1e18);
+    if(series.length>3) SNAP.hashrate = {current:j.currentHashrate/1e18, day0:0, series};
+    if(j.currentDifficulty) SNAP.difficulty.value = j.currentDifficulty;
+  }
+};
+const every = {blocks:20e3, price:60e3, mempool:20e3, difficulty:300e3, hashrate:1800e3};
+const feedPill = $("feed");
+function setFeed(){
+  const age = (Date.now()-lastOK)/1000;
+  if(!lastOK){ feedPill.textContent="FEED · SNAPSHOT"; feedPill.className="pill warn"; feedPill.title="Live data has not loaded yet. Showing the saved snapshot."; }
+  else if(age>120){ feedPill.textContent="FEED · STALE"; feedPill.className="pill warn"; feedPill.title="Last good update "+Math.round(age)+"s ago. Retrying."; }
+  else { feedPill.textContent="FEED · LIVE"; feedPill.className="pill live"; feedPill.title="Data from mempool.space, refreshed every 20 seconds."; }
+}
+async function run(name){
+  try{ await loaders[name](); lastOK = Date.now(); render(); fresh = false; }
+  catch(e){ console.warn("feed", name, e.message); }
+  setFeed();
+}
+Object.keys(loaders).forEach(n=>{ run(n); setInterval(()=>{ if(!document.hidden) run(n); }, every[n]); });
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ run("blocks"); run("mempool"); run("price"); } });
+setInterval(setFeed, 5000);
+/* ---------- Clocks ---------- */
+function tickClock(){
+  const now = new Date();
+  $("clock").textContent = now.toISOString().slice(11,19);
+  let s = Math.max(0, Math.floor(now/1000 - tip[1]));
+  const h = Math.floor(s/3600); s%=3600;
+  $("since").textContent = (h? h+"h ":"")+Math.floor(s/60)+"m "+String(s%60).padStart(2,"0")+"s";
+}
+tickClock(); setInterval(tickClock,1000);
+
+/* ---------- Furnace canvas ---------- */
+const cv = $("furnace"), cx = cv.getContext("2d");
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let W=0,H=0,DPR=1;
+function size(){
+  const r = cv.getBoundingClientRect();
+  DPR = Math.min(2, devicePixelRatio||1);
+  W = r.width; H = r.height;
+  cv.width = Math.max(1,W*DPR); cv.height = Math.max(1,H*DPR);
+  cx.setTransform(DPR,0,0,DPR,0,0);
+}
+new ResizeObserver(size).observe(cv); size();
+
+// particles: mempool tx drawn toward the core; hue from the real fee mix
+const pickBand = () => { let r=Math.random(),i=0; while(i<feeWeights.length-1 && r>feeWeights[i]){r-=feeWeights[i];i++;} return i; };
+const P = Array.from({length:220},()=>spawn({}));
+function spawn(p){
+  p.a = Math.random()*Math.PI*2;
+  p.r = 1.05 + Math.random()*0.6;
+  p.v = 0.0009 + Math.random()*0.0018;
+  p.band = pickBand();
+  p.s = 0.6 + Math.random()*1.6;
+  return p;
+}
+const bandCol = ["#ff5277","#ffb340","#6fd3ff","#6fd3ff","#6fd3ff"];
+
+let t0 = performance.now(), last = t0;
+function draw(now){
+  const dt = Math.min(50, now-last); last = now;
+  const t = (now - t0)/1000;
+  const bw = Math.max(26, Math.min(48, W/18)), gap = bw*0.45, by = H - bw - 34;
+  const zone = by - 14;
+  const cxp = W/2, cyp = zone/2 + 8;
+  const R = Math.max(40, Math.min(W/2 - 24, zone/2 - 16) / 1.72);
+  cx.clearRect(0,0,W,H);
+
+  // grid
+  cx.strokeStyle = "rgba(29,40,64,.55)"; cx.lineWidth = 1;
+  for(let x=(cxp%40); x<W; x+=40){cx.beginPath();cx.moveTo(x,0);cx.lineTo(x,H);cx.stroke();}
+  for(let y=(cyp%40); y<H; y+=40){cx.beginPath();cx.moveTo(0,y);cx.lineTo(W,y);cx.stroke();}
+
+  // difficulty epoch arc (outer)
+  cx.lineWidth = 2;
+  cx.strokeStyle = "rgba(111,211,255,.18)";
+  cx.beginPath(); cx.arc(cxp,cyp,R*1.62,0,Math.PI*2); cx.stroke();
+  cx.strokeStyle = "#6fd3ff"; cx.shadowColor="#6fd3ff"; cx.shadowBlur=10;
+  cx.beginPath(); cx.arc(cxp,cyp,R*1.62,-Math.PI/2,-Math.PI/2+Math.PI*2*D.progress/100); cx.stroke();
+  cx.shadowBlur=0;
+  // epoch ticks every 10%
+  for(let i=0;i<20;i++){
+    const a=-Math.PI/2+i/20*Math.PI*2, r1=R*1.62, r2=R*(i%2?1.66:1.7);
+    cx.strokeStyle="rgba(111,211,255,.35)"; cx.lineWidth=1;
+    cx.beginPath(); cx.moveTo(cxp+Math.cos(a)*r1,cyp+Math.sin(a)*r1); cx.lineTo(cxp+Math.cos(a)*r2,cyp+Math.sin(a)*r2); cx.stroke();
+  }
+  cx.fillStyle="#5d6b8a"; cx.font="10px 'Share Tech Mono', monospace"; cx.textAlign="center";
+  cx.fillText("EPOCH "+fmt(D.progress,1)+"%", cxp, cyp-R*1.62-10);
+
+  // hashrate ring: 30 radial bars, rotating slowly
+  const rot = reduce ? 0 : t*0.05;
+  const n = hs.length;
+  for(let i=0;i<n;i++){
+    const a = rot + i/n*Math.PI*2 - Math.PI/2;
+    const k = (hs[i]-hMin)/(hMax-hMin);
+    const r1 = R*1.08, r2 = r1 + R*(0.12 + k*0.36);
+    const last = i===n-1;
+    cx.strokeStyle = last ? "#ffb340" : `rgba(255,179,64,${0.25+k*0.55})`;
+    cx.lineWidth = Math.max(2, R*0.07);
+    cx.lineCap = "butt";
+    if(last){cx.shadowColor="#ffb340";cx.shadowBlur=16;}
+    cx.beginPath(); cx.moveTo(cxp+Math.cos(a)*r1,cyp+Math.sin(a)*r1); cx.lineTo(cxp+Math.cos(a)*r2,cyp+Math.sin(a)*r2); cx.stroke();
+    cx.shadowBlur=0;
+  }
+
+  // particles spiralling into the core
+  for(const p of P){
+    if(!reduce){ p.r -= p.v*dt*0.06; p.a += 0.0006*dt/(p.r); }
+    if(p.r < 0.32) spawn(p);
+    const rr = p.r*R*1.5;
+    const x = cxp+Math.cos(p.a)*rr, y = cyp+Math.sin(p.a)*rr;
+    cx.fillStyle = bandCol[p.band];
+    cx.globalAlpha = Math.min(1,(p.r-0.32)*2.2)*(p.band<2?0.95:0.55);
+    cx.fillRect(x,y,p.s,p.s);
+  }
+  cx.globalAlpha = 1;
+
+  // shockwave when a new block lands
+  const since = (now - newBlockAt)/1000;
+  if(since < 2.5){
+    const k = since/2.5;
+    cx.strokeStyle = `rgba(255,179,64,${1-k})`; cx.lineWidth = 3*(1-k)+1;
+    cx.beginPath(); cx.arc(cxp,cyp,R*(0.4+k*1.4),0,Math.PI*2); cx.stroke();
+  }
+  // core: the candidate block, pulsing like a nonce search
+  const pulse = reduce ? 0.5 : 0.5+0.5*Math.sin(t*2.2);
+  const core = R*0.55;
+  const g = cx.createRadialGradient(cxp,cyp,core*0.1,cxp,cyp,core*1.4);
+  g.addColorStop(0,`rgba(255,179,64,${0.28+pulse*0.18})`); g.addColorStop(1,"rgba(255,179,64,0)");
+  cx.fillStyle=g; cx.beginPath(); cx.arc(cxp,cyp,core*1.4,0,Math.PI*2); cx.fill();
+  cx.save(); cx.translate(cxp,cyp); cx.rotate(reduce?0:t*0.12);
+  cx.strokeStyle="#ffb340"; cx.lineWidth=1.5;
+  cx.strokeRect(-core*0.62,-core*0.62,core*1.24,core*1.24);
+  cx.rotate(Math.PI/4); cx.strokeStyle="rgba(255,179,64,.35)";
+  cx.strokeRect(-core*0.62,-core*0.62,core*1.24,core*1.24);
+  cx.restore();
+
+  // core readout
+  cx.textAlign="center"; cx.fillStyle="#c9d4ea";
+  cx.font=`600 ${Math.max(16,R*0.2)}px 'Chakra Petch', sans-serif`;
+  cx.fillText(fmt(SNAP.hashrate.current,1), cxp, cyp+R*0.03);
+  cx.font=`${Math.max(9,R*0.07)}px 'Share Tech Mono', monospace`; cx.fillStyle="#5d6b8a";
+  cx.fillText("EH/S · NETWORK", cxp, cyp+R*0.16);
+  cx.fillStyle="#6fd3ff";
+  cx.fillText("BUILDING #"+fmt(tip[0]+1), cxp, cyp-R*0.18);
+  // decorative nonce scroll
+  const nonce = reduce ? "0x00000000" : "0x"+((Math.floor(t*997331)>>>0)%0xffffffff).toString(16).padStart(8,"0");
+  cx.fillStyle="rgba(255,179,64,.6)";
+  cx.fillText("NONCE "+nonce, cxp, cyp+R*0.3);
+
+  // chain of real blocks along the bottom, scrolling
+  const span = SNAP.blocks.length*(bw+gap);
+  const off = reduce ? 0 : (t*14) % span;
+  const maxTx = Math.max(...SNAP.blocks.map(b=>b[2]));
+  for(let rep=-1; rep<=Math.ceil(W/span)+1; rep++){
+    SNAP.blocks.slice().reverse().forEach((b,i)=>{
+      const x = rep*span + i*(bw+gap) - off;
+      if(x<-bw||x>W) return;
+      const fill = b[2]/maxTx;
+      cx.strokeStyle = b===tip ? "#ffb340" : "rgba(111,211,255,.55)";
+      cx.lineWidth=1;
+      cx.strokeRect(x+.5,by+.5,bw,bw);
+      cx.fillStyle = b===tip ? "rgba(255,179,64,.35)" : "rgba(111,211,255,.18)";
+      cx.fillRect(x+1,by+1+bw*(1-fill),bw-1,bw*fill-1);
+      cx.fillStyle="#5d6b8a"; cx.font="9px 'Share Tech Mono', monospace"; cx.textAlign="center";
+      cx.fillText(String(b[0]).slice(-4), x+bw/2, by+bw+11);
+      // link
+      cx.strokeStyle="rgba(111,211,255,.3)";
+      cx.beginPath(); cx.moveTo(x+bw,by+bw/2); cx.lineTo(x+bw+gap,by+bw/2); cx.stroke();
+    });
+  }
+
+  if(!reduce) requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+if(reduce){ new ResizeObserver(()=>requestAnimationFrame(draw)).observe(cv); }
+
+/* ---------- Full screen + keep awake ---------- */
+let lock=null;
+$("fs").addEventListener("click", async ()=>{
+  try{
+    if(!document.fullscreenElement){ await document.documentElement.requestFullscreen(); $("fs").textContent="Exit"; }
+    else { await document.exitFullscreen(); $("fs").textContent="Full screen"; }
+  }catch(e){ $("fs").textContent="Unavailable"; }
+  try{ if(navigator.wakeLock && !lock){ lock = await navigator.wakeLock.request("screen"); } }catch(e){}
+});
+document.addEventListener("fullscreenchange",()=>{ if(!document.fullscreenElement) $("fs").textContent="Full screen"; });
+</script>
+
+</body>
+</html>
