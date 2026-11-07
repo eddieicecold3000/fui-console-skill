@@ -6,8 +6,9 @@ The included example, **MERKLE-21**, is a Bitcoin proof-of-work observatory runn
 
 ## What the skill teaches Claude
 
-- Writing a concept first: callsign, plain name, imagined station, hero visual, palette, data map
-- The anatomy that makes a screen read as FUI: animated canvas hero, dense instrument rails, logs, ticker, status pill
+- Writing a concept first: callsign, plain name, imagined station, physical metaphor, data map
+- Variety: picking a hero archetype (cutaway, map, isometric field, waterfall, ledger, horizon strip, fan-out, head-to-head and more), a composition, panel types and a palette family, then checking them against consoles already built so no two look alike
+- The anatomy that makes a screen read as FUI: animated canvas hero with pinned callouts, dense instrument modules, rules tables, small multiples, logs, status pill
 - Build rules: one file, no build step, no API keys, snapshot fallback, live/stale states, reduced-motion support
 - Testing at desktop and phone widths, with mocked data
 - An originality rule: learn the genre, never copy a specific work
